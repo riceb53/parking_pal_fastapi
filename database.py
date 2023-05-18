@@ -55,7 +55,7 @@ class Citation(Base):
     def seed_citations(self, filename):
         count = 0     
         data = load_csv_into_dict(filename)    
-        session = Session(bind=engine, expire_on_commit=False) 
+        session = Session(bind=engine, expire_on_commit=False)         
         for citation in data:
             coordinates_str = citation['geom']
             if coordinates_str:
@@ -67,10 +67,11 @@ class Citation(Base):
             else:  
                 g = geocoder.google(citation['Citation Location'] + " San Francisco, CA", key=Config.API_KEY)
                 count += 1
-                if g.status == 'ZERO_RESULTS':
+                if g.status == 'ZERO_RESULTS' or g.status == 'REQUEST_DENIED':
                     calculated_latitude = 0
                     calculated_longitude = 0
                 else:
+                    print('geocoder worked')
                     calculated_latitude = g.latlng[0]
                     calculated_longitude = g.latlng[1]
 
