@@ -10,6 +10,15 @@ import pdb
 import time
 import math
 
+def calculate_q1_q3(sorted_list):
+    n = len(sorted_list)
+    q1_index = (n + 1) // 4
+    q3_index = (3 * (n + 1)) // 4
+    q1 = sorted_list[q1_index - 1]
+    q3 = sorted_list[q3_index - 1]
+    return [q1.citation_issued_datetime.time(), q3.citation_issued_datetime.time()]
+
+
 def euclidean_distance(point1, point2):
     x1, y1 = point1
     x2, y2 = point2
@@ -70,7 +79,7 @@ class Citation(Base):
 
 
     def __repr__(self):
-        return "Citation(id={}, citation_number={}, latitude={}, longitude={}, location={})".format(self.id, self.citation_number, self.latitude, self.longitude, self.citation_location)
+        return "Citation(id={}, citation_number={}, latitude={}, longitude={}, location={}, citation_issued_datetime={})".format(self.id, self.citation_number, self.latitude, self.longitude, self.citation_location, self.citation_issued_datetime)
 
 
     @classmethod
@@ -202,6 +211,37 @@ class Citation(Base):
             citation.street_sweeping_segment_id = closest_coordinates.street_sweeping_segment_id
             session.commit()
             # make new column for citation that has streetsweepingsegment id
+    
+    @classmethod
+    def analysis(self, citations):
+        # sort citations 
+        sorted_citations = sorted(citations, key=lambda citation: citation.citation_issued_datetime.time())        
+        data = {
+            'types': {},
+            'hours': {},            
+            'street_sweeping_hours': {}
+        }
+        for citation in sorted_citations:            
+            if citation.violation_desc not in data['types']:
+                data['types'][citation.violation_desc] = 0            
+            data['types'][citation.violation_desc] += 1
+            beginning_of_hour = citation.citation_issued_datetime.replace(minute=0, second=0).strftime("%I:%M %p")
+            if beginning_of_hour not in data['hours']:
+                data['hours'][beginning_of_hour] = 0
+
+            data['hours'][beginning_of_hour] += 1            
+                
+        str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
+        q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
+        q1_q3 = calculate_q1_q3(sorted_citations)        
+
+        return {
+            'q1_q3': {
+                'q1_q3': q1_q3,
+                'q1_q3_str_clean': q1_q3_str_clean,
+            },
+            'data': data
+        }
 
 class StreetSweepingPoint(Base):
     __tablename__ = 'street_sweeping_points'

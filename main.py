@@ -17,16 +17,8 @@ app.add_middleware(
 )
 
 
-# from pydantic import BaseModel
-
-# I don't think this is necessary because users can't make a new citation
-# class CitationRequest(BaseModel):
-#     citation_number: str
-
-
-
 @app.get("/")
-def read_root(q: str = '762 Fulton St, San Francisco, CA 94102'):    
+def read_root(q: str = '1500 Fulton St San Francisco, CA'):    
     # untested
     session = Session(bind=engine, expire_on_commit=False)
     # get user address
@@ -43,14 +35,16 @@ def read_root(q: str = '762 Fulton St, San Francisco, CA 94102'):
     print(street_sweeping_segment)
     # find all Citations associated with StreetSweepingSegment
     # return those citations
-    
+
     # citation_list = session.query(Citation).filter(Citation.latitude.isnot(0)).all()
     citations = session.query(Citation).filter_by(street_sweeping_segment_id=street_sweeping_segment.id).all()
-    
+
+    analysis = Citation.analysis(citations)
     return {
         'citations': citations, 
         'street_sweeping_segment': street_sweeping_segment, 
-        'closest_coordinates': closest_coordinates
+        'closest_coordinates': closest_coordinates,
+        'analysis': analysis,
     }
 
 

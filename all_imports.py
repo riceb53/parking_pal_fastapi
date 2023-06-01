@@ -16,9 +16,15 @@ from shapely.wkt import loads
 
 engine = create_engine("sqlite:///parking_pal_fastapidb.db")
 Base = declarative_base()
-session = Session(bind=engine, expire_on_commit=False) 
+session = Session(bind=engine, expire_on_commit=False)
+# Citation.geocode_citations()
 # Citation.seed_citations('seeds/citations.csv')
 
 
 # delete all citations session.query(Citation).delete()
 # session.commit()
+
+# uvicorn main:app --reload
+# alembic revision — autogenerate -m "First commit"
+# alembic upgrade head
+
