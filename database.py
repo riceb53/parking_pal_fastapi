@@ -16,7 +16,7 @@ def calculate_q1_q3(sorted_list):
     q3_index = (3 * (n + 1)) // 4
     q1 = sorted_list[q1_index - 1]
     q3 = sorted_list[q3_index - 1]
-    return [q1.citation_issued_datetime.time(), q3.citation_issued_datetime.time()]
+    return [q1.citation_issued_datetime.time().strftime("%H:%M"), q3.citation_issued_datetime.time().strftime("%H:%M")]
 
 
 def euclidean_distance(point1, point2):
@@ -229,8 +229,13 @@ class Citation(Base):
             if beginning_of_hour not in data['hours']:
                 data['hours'][beginning_of_hour] = 0
 
-            data['hours'][beginning_of_hour] += 1            
-                
+            data['hours'][beginning_of_hour] += 1     
+        # pdb.set_trace()       
+        a = sorted(data['types'], key=lambda k: data['types'][k])
+        data['types'] = sorted(data['types'].items(), key=lambda x:x[1], reverse=True)
+        data['types'] = dict(data['types'])
+
+      
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
         q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
         q1_q3 = calculate_q1_q3(sorted_citations)        
