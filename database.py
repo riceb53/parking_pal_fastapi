@@ -100,13 +100,6 @@ class Citation(Base):
             else:  
                 calculated_latitude = 0
                 calculated_longitude = 0                
-                # g = geocoder.google(citation['Citation Location'] + " San Francisco, CA", key=Config.API_KEY)
-                # count += 1
-                    # if g.status == 'ZERO_RESULTS' or g.status == 'REQUEST_DENIED':
-                    # else:
-                    #     print('geocoder worked')
-                    #     calculated_latitude = g.latlng[0]
-                    #     calculated_longitude = g.latlng[1]
 
             new_citation = Citation(
                 citation_number=citation['Citation Number'],

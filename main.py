@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI, status
 from database import Base, engine, find_closest_coordinates, euclidean_distance, Citation, StreetSweepingPoint, StreetSweepingSegment
 from sqlalchemy.orm import Session
@@ -51,3 +52,6 @@ def read_root(q: str = '1500 Fulton St San Francisco, CA'):
 @app.get("/search")
 def search():
     return {"the results of your search": []}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
