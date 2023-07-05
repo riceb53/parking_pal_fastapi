@@ -4,6 +4,9 @@ parking_pal_fastapi.db
 working_parking_pal_fastapi.db
 seeded_parking_pal_fastapi.db-journal
 practice_parking_pal_fastapi.db
+large_parking_pal_fastapidb.db
 parking_pal_fastapidb.db
 parking_pal_fastapidb2.db
 all_imports.py
+__pycache__
+*/__pycache__/*
