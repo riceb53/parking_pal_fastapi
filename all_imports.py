@@ -20,11 +20,14 @@ session = Session(bind=engine, expire_on_commit=False)
 # Citation.geocode_citations()
 # Citation.seed_citations('seeds/citations.csv')
 
+# citations = session.query(Citation).all()
+# citation_count = session.query(Citation).count()
+
 
 # delete all citations session.query(Citation).delete()
 # session.commit()
 
 # uvicorn main:app --reload
-# alembic revision — autogenerate -m "First commit"
+# alembic revision --autogenerate -m "First commit"
 # alembic upgrade head
 

@@ -19,7 +19,7 @@ app.add_middleware(
 
 
 @app.get("/")
-def read_root(q: str = '1500 Fulton St San Francisco, CA'):    
+def read_root(q: str = '1500 FULTON STREET, San Francisco, CA'):    
     # untested
     session = Session(bind=engine, expire_on_commit=False)
     # get user address
@@ -50,8 +50,45 @@ def read_root(q: str = '1500 Fulton St San Francisco, CA'):
 
 
 @app.get("/search")
-def search():
+def search():    
     return {"the results of your search": []}
+
+@app.get("/address_search")
+def address_search(q: str = '1500 FULTON STREET, San Francisco, CA'):
+    # pdb.set_trace()
+    # based on input address
+    trimmed_address = q.split(", ")[0].split()
+    street_number = int(trimmed_address[0])
+    street_name = ''.join(trimmed_address[1:-1])
+    street_suffix = trimmed_address[-1]
+    even_or_odd = int(street_number) % 2
+
+    beginning_of_block = ((street_number // 100) * 100)
+    end_of_block = (((street_number // 100) + 1) * 100) - 1
+
+
+        # find citations on that same block
+    session = Session(bind=engine, expire_on_commit=False)
+    citations = session.query(Citation).filter(
+        Citation.location_number.between(beginning_of_block, end_of_block),
+        Citation.location_street.ilike(f'%{street_name}%'),
+        Citation.location_suffix.ilike(f'%{street_suffix}%'),
+        Citation.location_number % 2 == even_or_odd,
+        Citation.geocode_failed.isnot(True),
+        Citation.latitude.isnot(0)
+    ).all()
+
+        # return those citations
+    print(len(citations))
+    analysis = Citation.analysis(citations)
+    g = geocoder.osm(q)
+    user_location = {'latitude': g.json['lat'], 'longitude': g.json['lng']}
+    return {
+        'citations': citations, 
+        # 'street_sweeping_segment': street_sweeping_segment, 
+        'closest_coordinates': user_location,
+        'analysis': analysis,
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

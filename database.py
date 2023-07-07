@@ -61,6 +61,9 @@ class Citation(Base):
     violation = Column(String(255))
     violation_desc = Column(String(255))
     citation_location = Column(String(255))
+    location_street = Column(String(255))
+    location_number = Column(Integer)
+    location_suffix = Column(String(255))
     vehicle_plate_state = Column(String(255))
     vehicle_plate = Column(String(255))
     fine_amount = Column(Integer)
@@ -76,6 +79,7 @@ class Citation(Base):
     date_created = Column(DateTime, default=datetime.utcnow)
     street_sweeping_segment_id = Column(Integer)
     geocode_failed = Column(Boolean)
+    bad_address = Column(Boolean)
 
 
     def __repr__(self):
@@ -231,15 +235,170 @@ class Citation(Base):
       
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
         q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
+        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%H:%M"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%H:%M")]
         q1_q3 = calculate_q1_q3(sorted_citations)        
 
         return {
             'q1_q3': {
                 'q1_q3': q1_q3,
                 'q1_q3_str_clean': q1_q3_str_clean,
+                'all_str_clean': all_str_clean,
             },
             'data': data
         }
+    
+    @classmethod
+    def split_location_for_search(self):
+        # find all locations
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False) 
+        print('before getting citations')
+        number_of_segments = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0}
+        ls = {}
+        amp_count = 0
+        count = 0
+        convert_to_standard_suffix = {
+            'ST': 'STREET',
+            'AVE': 'AVENUE',
+            'STREET': 'STREET',
+            'AVENUE': 'AVENUE',
+            'BLVD': 'BOULEVARD',
+            'DR': 'DRIVE',
+            'WAY': 'WAY',
+            'TER': 'TERRACE',
+            'CT': 'COURT',
+            'PL': 'PLACE',
+            'DRIVE': 'DRIVE',
+            'PARK': 'PARK',
+            'HWY': 'HIGHWAY',
+            'HWY': 'HIGHWAY',
+            'RD': 'ROAD',
+            'LN': 'LANE',
+            'STATION': 'STATION',
+            'WEST': 'WEST',
+            'EAST': 'EAST',
+            'CIR': 'CIRCLE',
+            'ROAD': 'ROAD',
+            'ALY': 'ALLEY',
+            'STA': 'STATION',
+            'WY': 'WAY',
+        }
+
+        
+        # citations = session.query(Citation).all()        
+        # citations = session.query(Citation).filter(Citation.latitude == 0).all()        
+        citations = session.query(Citation).filter(Citation.location_street == None, Citation.bad_address.isnot(True)).all()
+        print(len(citations))
+        for citation in citations:
+            count += 1
+            if count % 1000 == 0:
+                print(count, citation)
+            location = citation.citation_location.split()
+            if '&' in citation.citation_location or len(location) == 1 or len(location) == 0:
+                amp_count += 1   
+                citation.bad_address = True
+                session.commit()             
+                continue                
+            number_of_segments[len(location)] += 1            
+         
+            if len(location) == 2:
+                citation.location_number = location[0]
+                citation.location_street = location[1]                                                
+                # try to geocode?
+                if location[-1] == "STREET":
+                    citation.bad_address = True
+                    session.commit()     
+                    continue
+                elif "BROADWAY" in location[-1] or "EMBARCADERO" in location[-1]:
+                    continue                
+                g = geocoder.osm(citation.citation_location + " San Francisco, CA")                
+                if g.json and g.json['raw'] and g.json['raw']['address'] and 'street' in g.json['raw']['address']:
+                    address_segments = g.json['raw']['address']['road'].split()
+                    citation.location_suffix = address_segments[-1].upper()   
+                    session.commit()           
+                else:
+                    citation.bad_address = True
+                    session.commit()     
+                continue
+
+            # ls == location suffix?
+            if location[-1] in ls:
+                ls[location[-1]] += 1
+            else:
+                ls[location[-1]] = 1
+
+            #####
+            # regular/3+
+            # split into number name and suffix
+                # 
+            citation.location_number = location[0]
+            citation.location_street = ''.join(location[1:-1])
+            # CONVERT, wait on results   
+            if location[-1] in convert_to_standard_suffix:
+                citation.location_suffix = convert_to_standard_suffix[location[-1]]
+            else:
+                citation.location_suffix = location[-1]
+            session.commit()
+            # update cols
+            # save
+
+            
+            # session.commit()
+            # else:
+    @classmethod
+    def standardize_street_suffix(self):
+        convert_to_standard_suffix = {
+            'ST': 'STREET',
+            'AVE': 'AVENUE',
+            'STREET': 'STREET',
+            'AVENUE': 'AVENUE',
+            'BLVD': 'BOULEVARD',
+            'DR': 'DRIVE',
+            'WAY': 'WAY',
+            'TER': 'TERRACE',
+            'CT': 'COURT',
+            'PL': 'PLACE',
+            'DRIVE': 'DRIVE',
+            'PARK': 'PARK',
+            'HWY': 'HIGHWAY',
+            'HWY': 'HIGHWAY',
+            'RD': 'ROAD',
+            'LN': 'LANE',
+            'STATION': 'STATION',
+            'WEST': 'WEST',
+            'EAST': 'EAST',
+            'CIR': 'CIRCLE',
+            'ROAD': 'ROAD',
+            'ALY': 'ALLEY',
+            'STA': 'STATION',
+            'WY': 'WAY',
+        }
+
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False) 
+        citations = session.query(Citation).filter(Citation.location_suffix.isnot(True), Citation.bad_address.isnot(True)).all()
+        print(len(citations))
+        count = 0
+        for citation in citations:            
+            count += 1
+            if count % 1000 == 0:
+                print(count, citation)
+            location = citation.citation_location.split()            
+            if len(location) > 2:
+                original_suffix = location[-1].upper()
+                # CONVERT, wait on results
+                if original_suffix in convert_to_standard_suffix:
+                    citation.location_suffix = convert_to_standard_suffix[original_suffix]
+                else:
+                    citation.location_suffix = original_suffix
+                session.commit()
+        
+        
+
+
+        # get citation_location
+        # split into pieces
+        # assign to different columns
 
 class StreetSweepingPoint(Base):
     __tablename__ = 'street_sweeping_points'
