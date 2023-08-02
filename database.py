@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, MetaData, Table, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, MetaData, Table, Boolean, func
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import csv
@@ -9,6 +9,8 @@ from shapely.wkt import loads
 import pdb
 import time
 import math
+import pandas as pd
+import calendar
 
 def calculate_q1_q3(sorted_list):
     n = len(sorted_list)
@@ -17,6 +19,14 @@ def calculate_q1_q3(sorted_list):
     q1 = sorted_list[q1_index - 1]
     q3 = sorted_list[q3_index - 1]
     return [q1.citation_issued_datetime.time().strftime("%H:%M"), q3.citation_issued_datetime.time().strftime("%H:%M")]
+
+def calculate_middle_80(sorted_list):
+    n = len(sorted_list)
+    first_decile = int(n * 0.1)
+    last_decile = int(n * 0.9)
+
+    return [first_decile.citation_issued_datetime.time().strftime("%H:%M"), last_decile.citation_issued_datetime.time().strftime("%H:%M")]
+
 
 
 def euclidean_distance(point1, point2):
@@ -58,6 +68,7 @@ class Citation(Base):
     id = Column(Integer, primary_key=True)    
     citation_number = Column(String(255))        
     citation_issued_datetime = Column(DateTime)
+    citation_issued_day_of_week = Column(String(255))
     violation = Column(String(255))
     violation_desc = Column(String(255))
     citation_location = Column(String(255))
@@ -234,14 +245,15 @@ class Citation(Base):
 
       
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
-        q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
+        # q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
+        middle_80 = calculate_q1_q3(str_clean_citations)
         all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%H:%M"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%H:%M")]
         q1_q3 = calculate_q1_q3(sorted_citations)        
 
         return {
             'q1_q3': {
                 'q1_q3': q1_q3,
-                'q1_q3_str_clean': q1_q3_str_clean,
+                # 'q1_q3_str_clean': q1_q3_str_clean,
                 'all_str_clean': all_str_clean,
             },
             'data': data
@@ -392,13 +404,64 @@ class Citation(Base):
                 else:
                     citation.location_suffix = original_suffix
                 session.commit()
-        
-        
+    
+    @classmethod
+    def calculate_relative_frequencies(self, block_citations):
+        pass
+        # find "Expected" tickets per block
+        # new table
+        # calculate total tickets
+        # calculate average tickets per block
+        # calculate average tickets per block of each type (and percentage)
+        # 
 
 
-        # get citation_location
-        # split into pieces
-        # assign to different columns
+        # find actual tickets per block
+
+
+        # see total stats (how many total tix)
+        # how does that compare to other blocks?
+
+        # what kinds of tix are most common here in a relatvie sense?
+
+        # what days/times are tickets most frequently?
+        # filter down by day of week and time
+
+        # make new col for day of week?
+
+        # figure out how to display information (probably in tabs)
+
+            
+        # session = Session(bind=engine, expire_on_commit=False)         
+        # total_counts = session.query(func.count('*'), Citation.violation_desc).group_by(Citation.violation_desc).order_by(func.count('*').desc()).all()
+
+        # # pdb.set_trace()
+        # total_sum = sum(item[0] for item in total_counts)
+        # relative_frequencies_total = {item[1]: item[0] / total_sum for item in total_counts}
+
+        # frequencies = {}
+        # for citation in block_citations:
+        #     if citation.violation_desc in frequencies:
+        #         frequencies[citation.violation_desc] += 1
+        #     else:
+        #         frequencies[citation.violation_desc] = 1        
+        # relative_frequencies_block = {key: value / total_sum for key, value in total_counts.items()}
+
+    @classmethod
+    def find_day_of_week(self):
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False) 
+        print('before getting citations')        
+        citations = session.query(Citation).filter(Citation.citation_issued_day_of_week == None).all()
+        count = 0
+        for citation in citations: 
+            count += 1
+            if count % 10000 == 0:
+                print(count)
+            citation.citation_issued_day_of_week = calendar.day_name[citation.citation_issued_datetime.weekday()]
+            session.commit()
+            # find citation.citation_issued_datetime
+    
 
 class StreetSweepingPoint(Base):
     __tablename__ = 'street_sweeping_points'
@@ -484,3 +547,48 @@ class StreetSweepingSegment(Base):
             
             if count % 1000:
                 print(count)
+
+class TicketData(Base):
+    __tablename__ = 'ticket_data'
+    id = Column(Integer, primary_key=True)    
+    total_tickets =  Column(Integer)    
+    violation_desc = Column(String(255))        
+    relative_frequency = Column(Float())
+
+    @classmethod
+    def seed(self):
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False)         
+        session.query(TicketData).delete()
+        # make new 'all'
+        total_tickets = session.query(Citation).filter(Citation.geocode_failed.isnot(True), Citation.bad_address.isnot(True)).count()        
+        td = TicketData(                
+                total_tickets=total_tickets,
+                violation_desc='all',
+                relative_frequency= 1
+            )
+        session.add(td)
+        session.commit()
+        total_counts = session.query(func.count('*'), Citation.violation_desc).group_by(Citation.violation_desc).order_by(func.count('*').desc()).all()
+        for ticket_desc in total_counts:
+            td = TicketData(                
+                total_tickets=ticket_desc[0],
+                violation_desc=ticket_desc[1],
+                relative_frequency= (ticket_desc[0] / session.query(TicketData).filter(TicketData.violation_desc == 'all').limit(1).all()[0].total_tickets)
+            )
+            session.add(td)
+            session.commit()
+        # find relative frequencies of each
+        # loop through
+        # make a new totalticketdata for each
+
+
+    def expected_tickets_per_block(self):        
+        pass
+        # engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        # session = Session(bind=engine, expire_on_commit=False) 
+        # city_blocks_sf = 13000
+        # estimated_percentage_of_tickets = 1 / city_blocks_sf
+        # return self.relative_frequency * session.query(Citation).filter(Citation.ticket_type == 'all').limit(1).all().total_tickets
+    # varoubs percentages for each ticket
+    # expected tickets per block

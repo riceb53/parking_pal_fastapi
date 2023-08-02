@@ -78,6 +78,8 @@ def address_search(q: str = '1500 FULTON STREET, San Francisco, CA'):
         Citation.latitude.isnot(0)
     ).all()
 
+    # Citation.calculate_relative_frequencies(citations)
+
         # return those citations
     print(len(citations))
     analysis = Citation.analysis(citations)

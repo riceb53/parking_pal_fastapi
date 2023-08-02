@@ -2,7 +2,7 @@
 %load_ext autoreload
 %autoreload 2
 from fastapi import FastAPI, status
-from database import Base, engine, Citation, StreetSweepingPoint, StreetSweepingSegment
+from database import Base, engine, Citation, StreetSweepingPoint, StreetSweepingSegment, TicketData
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Float, MetaData
@@ -28,6 +28,11 @@ session = Session(bind=engine, expire_on_commit=False)
 # session.commit()
 
 # uvicorn main:app --reload
-# alembic revision --autogenerate -m "First commit"
+# alembic revision --autogenerate -m "add citation_issued_day_of_week"
 # alembic upgrade head
 
+
+
+# ttd = TicketData(violation_desc='all', total_tickets=1301050, relative_frequency=1)
+# session.add(ttd)
+# session.commit()
