@@ -18,14 +18,14 @@ def calculate_q1_q3(sorted_list):
     q3_index = (3 * (n + 1)) // 4
     q1 = sorted_list[q1_index - 1]
     q3 = sorted_list[q3_index - 1]
-    return [q1.citation_issued_datetime.time().strftime("%H:%M %p"), q3.citation_issued_datetime.time().strftime("%H:%M %p")]
+    return [q1.citation_issued_datetime.time().strftime("%I:%M %p"), q3.citation_issued_datetime.time().strftime("%I:%M %p")]
 
 def calculate_middle_80(sorted_list):
     n = len(sorted_list)
     first_decile = int(n * 0.1)
     last_decile = int(n * 0.9)
 
-    return [first_decile.citation_issued_datetime.time().strftime("%H:%M"), last_decile.citation_issued_datetime.time().strftime("%H:%M")]
+    return [first_decile.citation_issued_datetime.time().strftime("%I:%M"), last_decile.citation_issued_datetime.time().strftime("%I:%M")]
 
 
 
@@ -264,7 +264,7 @@ class Citation(Base):
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
         # q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
         middle_80 = calculate_q1_q3(str_clean_citations)
-        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%H:%M %p"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%H:%M %p")]
+        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%I:%M %p"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%I:%M %p")]
         q1_q3 = calculate_q1_q3(sorted_citations)        
 
         return {
