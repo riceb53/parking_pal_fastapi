@@ -13,3 +13,4 @@ __pycache__
 .venv/
 gunicorn_start
 logs
+99_parking_pal_fastapidb.db
