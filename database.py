@@ -18,7 +18,7 @@ def calculate_q1_q3(sorted_list):
     q3_index = (3 * (n + 1)) // 4
     q1 = sorted_list[q1_index - 1]
     q3 = sorted_list[q3_index - 1]
-    return [q1.citation_issued_datetime.time().strftime("%H:%M"), q3.citation_issued_datetime.time().strftime("%H:%M")]
+    return [q1.citation_issued_datetime.time().strftime("%H:%M %p"), q3.citation_issued_datetime.time().strftime("%H:%M %p")]
 
 def calculate_middle_80(sorted_list):
     n = len(sorted_list)
@@ -223,40 +223,58 @@ class Citation(Base):
     @classmethod
     def analysis(self, citations):
         # sort citations 
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False) 
         sorted_citations = sorted(citations, key=lambda citation: citation.citation_issued_datetime.time())        
         data = {
-            'types': {},
+            'types_and_frequencies': {},
             'hours': {},            
-            'street_sweeping_hours': {}
+            'street_sweeping_hours': {}            
         }
+
+        violation_desc_counts = {}
         for citation in sorted_citations:            
-            if citation.violation_desc not in data['types']:
-                data['types'][citation.violation_desc] = 0            
-            data['types'][citation.violation_desc] += 1
+            if citation.violation_desc not in violation_desc_counts:
+                violation_desc_counts[citation.violation_desc] = 0
+            violation_desc_counts[citation.violation_desc] += 1
+
+            
             beginning_of_hour = citation.citation_issued_datetime.replace(minute=0, second=0).strftime("%I:%M %p")
             if beginning_of_hour not in data['hours']:
                 data['hours'][beginning_of_hour] = 0
+            data['hours'][beginning_of_hour] += 1    
 
-            data['hours'][beginning_of_hour] += 1     
+        data['types_and_frequencies'] = {}
+        for violation in violation_desc_counts.keys():
+            estimated_percentage = round(session.query(TicketData).filter(TicketData.violation_desc == violation).first().relative_frequency * 100)
+            actual_percentage = round((violation_desc_counts[violation] / len(sorted_citations)) * 100)
+            data['types_and_frequencies'][violation] = {'estimated_percentage': estimated_percentage, 'actual_percentage': actual_percentage}
+            
         # pdb.set_trace()       
-        a = sorted(data['types'], key=lambda k: data['types'][k])
-        data['types'] = sorted(data['types'].items(), key=lambda x:x[1], reverse=True)
-        data['types'] = dict(data['types'])
+        # what does this do?
+        # a = sorted(data['types_and_frequencies'], key=lambda k: data['types_and_frequencies'][k])
+        # data['types_and_frequencies'] = sorted(data['types_and_frequencies'].items(), key=lambda x:x[1], reverse=True)
+        # data['types_and_frequencies'] = dict(data['types_and_frequencies'])
+
+        sorted_types = sorted(data['types_and_frequencies'].items(), key=lambda item: item[1]['estimated_percentage'], reverse=True)
+
+        data['types_and_frequencies'] = dict(sorted_types)
 
       
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
         # q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
         middle_80 = calculate_q1_q3(str_clean_citations)
-        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%H:%M"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%H:%M")]
+        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%H:%M %p"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%H:%M %p")]
         q1_q3 = calculate_q1_q3(sorted_citations)        
 
         return {
             'q1_q3': {
                 'q1_q3': q1_q3,
                 # 'q1_q3_str_clean': q1_q3_str_clean,
-                'all_str_clean': all_str_clean,
+                'str_clean': all_str_clean,
             },
-            'data': data
+            'data': data,
+            'expected_tickets_per_block': TicketData.expected_tickets_per_block(citations)
         }
     
     @classmethod
@@ -582,13 +600,35 @@ class TicketData(Base):
         # loop through
         # make a new totalticketdata for each
 
+    @classmethod
+    def expected_tickets_per_block(self, citations):   
+        # find total tickets on this block    #  
+        # find expected (total tickets /12k). compare the two
+        # for each ticket data, do total tickets of that type / 12k and compare to the total tickets of that type for this block, scaled by total tickets for this block
+        #         
+        engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
+        session = Session(bind=engine, expire_on_commit=False) 
+        city_blocks_sf = 13000
+        estimated_percentage_of_tickets = 1 / city_blocks_sf
+        total_ticket_count = session.query(TicketData).filter_by(violation_desc='all').first().total_tickets
+        expected_tickets_average_block = estimated_percentage_of_tickets * total_ticket_count
+        tickets_for_this_block = len(citations)
 
-    def expected_tickets_per_block(self):        
-        pass
-        # engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
-        # session = Session(bind=engine, expire_on_commit=False) 
-        # city_blocks_sf = 13000
-        # estimated_percentage_of_tickets = 1 / city_blocks_sf
+        relative_number_of_tickets = (tickets_for_this_block - expected_tickets_average_block) / expected_tickets_average_block
+
+        raw_percentage = round(relative_number_of_tickets * 100)
+        positive_percentage = abs(raw_percentage)
+
+        if raw_percentage > 0:
+            sentence = f"This block has {positive_percentage}% more tickets than the average block in San Francisco"
+        elif raw_percentage < 0:
+            sentence = f"This block has {positive_percentage}% less tickets than the average block in San Francisco"        
+        else:
+            sentence = f"This block has an average number of tickets for San Francisco"        
+        return sentence
+
+        # len(citations) - 
+        
         # return self.relative_frequency * session.query(Citation).filter(Citation.ticket_type == 'all').limit(1).all().total_tickets
     # varoubs percentages for each ticket
     # expected tickets per block
