@@ -12,13 +12,16 @@ import math
 import pandas as pd
 import calendar
 
-def calculate_q1_q3(sorted_list):
-    n = len(sorted_list)
-    q1_index = (n + 1) // 4
-    q3_index = (3 * (n + 1)) // 4
-    q1 = sorted_list[q1_index - 1]
-    q3 = sorted_list[q3_index - 1]
-    return [q1.citation_issued_datetime.time().strftime("%I:%M %p"), q3.citation_issued_datetime.time().strftime("%I:%M %p")]
+def calculate_q1_q3(sorted_list):        
+    if len(sorted_list) < 4:
+        return []
+    else:
+        n = len(sorted_list)
+        q1_index = (n + 1) // 4
+        q3_index = (3 * (n + 1)) // 4
+        q1 = sorted_list[q1_index - 1]
+        q3 = sorted_list[q3_index - 1]
+        return [q1.citation_issued_datetime.time().strftime("%I:%M %p"), q3.citation_issued_datetime.time().strftime("%I:%M %p")]
 
 def calculate_middle_80(sorted_list):
     n = len(sorted_list)
@@ -137,7 +140,7 @@ class Citation(Base):
             session.add(new_citation)
             session.commit()
             count += 1
-            # pdb.set_trace()
+            
             print(count)
             if count % 10_000:
                 print(count)
@@ -197,8 +200,6 @@ class Citation(Base):
                     print(g)
                     citation.geocode_failed = True                    
                     session.commit()
-                    # pdb.set_trace()  
-            # print(citation)
     
     @classmethod
     def find_street_sweeping_segment(self):
@@ -221,7 +222,7 @@ class Citation(Base):
             # make new column for citation that has streetsweepingsegment id
     
     @classmethod
-    def analysis(self, citations):
+    def analysis(self, citations):        
         # sort citations 
         engine = create_engine("sqlite:///parking_pal_fastapidb.db")        
         session = Session(bind=engine, expire_on_commit=False) 
@@ -249,13 +250,7 @@ class Citation(Base):
             estimated_percentage = round(session.query(TicketData).filter(TicketData.violation_desc == violation).first().relative_frequency * 100)
             actual_percentage = round((violation_desc_counts[violation] / len(sorted_citations)) * 100)
             data['types_and_frequencies'][violation] = {'estimated_percentage': estimated_percentage, 'actual_percentage': actual_percentage}
-            
-        # pdb.set_trace()       
-        # what does this do?
-        # a = sorted(data['types_and_frequencies'], key=lambda k: data['types_and_frequencies'][k])
-        # data['types_and_frequencies'] = sorted(data['types_and_frequencies'].items(), key=lambda x:x[1], reverse=True)
-        # data['types_and_frequencies'] = dict(data['types_and_frequencies'])
-
+                
         sorted_types = sorted(data['types_and_frequencies'].items(), key=lambda item: item[1]['estimated_percentage'], reverse=True)
 
         data['types_and_frequencies'] = dict(sorted_types)
@@ -264,7 +259,10 @@ class Citation(Base):
         str_clean_citations = [citation for citation in sorted_citations if citation.violation_desc == 'STR CLEAN']
         # q1_q3_str_clean = calculate_q1_q3(str_clean_citations)
         middle_80 = calculate_q1_q3(str_clean_citations)
-        all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%I:%M %p"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%I:%M %p")]
+        if len(str_clean_citations) < 2:
+            all_str_clean = []
+        else:
+            all_str_clean = [str_clean_citations[0].citation_issued_datetime.time().strftime("%I:%M %p"), str_clean_citations[-1].citation_issued_datetime.time().strftime("%I:%M %p")]
         q1_q3 = calculate_q1_q3(sorted_citations)        
 
         return {
@@ -453,7 +451,7 @@ class Citation(Base):
         # session = Session(bind=engine, expire_on_commit=False)         
         # total_counts = session.query(func.count('*'), Citation.violation_desc).group_by(Citation.violation_desc).order_by(func.count('*').desc()).all()
 
-        # # pdb.set_trace()
+
         # total_sum = sum(item[0] for item in total_counts)
         # relative_frequencies_total = {item[1]: item[0] / total_sum for item in total_counts}
 
@@ -519,10 +517,8 @@ class StreetSweepingSegment(Base):
         session.query(StreetSweepingSegment).delete()
         session.query(StreetSweepingPoint).delete()
         session.commit()
-        for sss in data:
-            # pdb.set_trace()
-            # go through each, add normally but make new streetsweepingpoint model to handle all the street sweeping points
-            # print(count)            
+        for sss in data:            
+            # go through each, add normally but make new streetsweepingpoint model to handle all the street sweeping points            
 
             new_sss = StreetSweepingSegment(
                 cnn=sss['CNN'],
@@ -545,8 +541,6 @@ class StreetSweepingSegment(Base):
             )
             session.add(new_sss)
             session.commit()
-            # if count == 3132 or count == 3133:
-            #     pdb.set_trace()
             if sss['Line']:
                 linestring = loads(sss['Line'])
                 coordinates = list(linestring.coords)                        
@@ -561,7 +555,7 @@ class StreetSweepingSegment(Base):
                     session.commit()
 
             count += 1
-            # pdb.set_trace()
+
             
             if count % 1000:
                 print(count)

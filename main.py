@@ -55,7 +55,7 @@ def search():
 
 @app.get("/address_search")
 def address_search(q: str = '1500 FULTON STREET, San Francisco, CA'):
-    # pdb.set_trace()
+
     # based on input address
     trimmed_address = q.split(", ")[0].split()
     street_number = int(trimmed_address[0])
@@ -81,7 +81,6 @@ def address_search(q: str = '1500 FULTON STREET, San Francisco, CA'):
     # Citation.calculate_relative_frequencies(citations)
 
         # return those citations
-    print(len(citations))
     analysis = Citation.analysis(citations)
     g = geocoder.osm(q)
     user_location = {'latitude': g.json['lat'], 'longitude': g.json['lng']}
