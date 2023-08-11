@@ -49,11 +49,11 @@ def read_root(q: str = '1500 FULTON STREET, San Francisco, CA'):
     }
 
 
-@app.get("/address_search")
+@app.get("/search")
 def search():    
     return {"the results of your search": []}
 
-@app.get("/search")
+@app.get("/address_search")
 def address_search(q: str = '1500 FULTON STREET, San Francisco, CA'):
 
     # based on input address
